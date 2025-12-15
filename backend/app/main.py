@@ -7,6 +7,7 @@ from app.core.settings import SESSION_SECRET_KEY
 from app.api.auth import router as auth_router
 from app.api.gmail import router as gmail_router
 from app.api.events import router as events_router  # ★ 追加
+from app.core.settings import FRONTEND_BASE_URL
 
 
 app = FastAPI(
@@ -18,6 +19,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        FRONTEND_BASE_URL,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
@@ -32,8 +34,8 @@ app.add_middleware(
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET_KEY,
-    same_site="lax",
-    https_only=False,  # 本番では True + HTTPS にする
+    same_site="none",
+    https_only=True,  # 本番では True + HTTPS にする
 )
 
 # --- ルーター登録 ---
