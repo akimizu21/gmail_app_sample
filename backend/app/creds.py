@@ -26,9 +26,18 @@ def get_flow(redirect_uri: str | None = None) -> Flow:
     """OAuth Flowを作成"""
     if redirect_uri is None:
         redirect_uri = f"{BACKEND_BASE_URL}/api/gmail/callback"
+    
+    client_config = {
+        "web": {
+            "client_id": os.environ["GOOGLE_CLIENT_ID"],
+            "client_secret": os.environ["GOOGLE_CLIENT_SECRET"],
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+        }
+    }
 
     flow = Flow.from_client_secrets_file(
-        str(CLIENT_SECRET_FILE),
+        client_config,
         scopes=SCOPES,
         redirect_uri=redirect_uri
     )
