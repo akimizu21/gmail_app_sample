@@ -39,7 +39,10 @@ async def gmail_authorize(request: Request):
 
 
 @router.get("/gmail/callback")
-async def gmail_callback(request: Request):
+async def gmail_callback(
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Gmail認証のコールバック"""
     try:
         session = request.session
@@ -48,11 +51,17 @@ async def gmail_callback(request: Request):
                 url=f"{FRONTEND_BASE_URL}/?error=not_logged_in"
             )
 
-        user_id = session["google_id"]
-        # request.url は Starlette の URL オブジェクト → str() で完全URL
+        google_sub = session["google_id"]
+
+        # ✅ google_sub → User.id に変換
+        user = db.query(User).filter(User.google_sub == google_sub).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
         authorization_response = str(request.url)
 
-        fetch_token(authorization_response, user_id)
+        # ✅ User.id を渡す
+        fetch_token(authorization_response, user.id)
 
         print("✅ Gmail認証成功")
         return RedirectResponse(
