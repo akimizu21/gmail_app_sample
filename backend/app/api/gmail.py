@@ -40,19 +40,29 @@ async def gmail_authorize(request: Request):
 
 @router.get("/gmail/callback")
 async def gmail_callback(
+    
     request: Request,
     db: Session = Depends(get_db)
 ):
+    # デバック用ログ
+    print("🔥🔥🔥 gmail_callback に到達しました")
+    print("URL:", request.url)
+
     session = request.session
     if "google_id" not in session:
         return RedirectResponse(
             url=f"{FRONTEND_BASE_URL}/?error=not_logged_in"
         )
 
-    user_id = session["google_id"]
+    user_id = session["ueser_id"]
+
     authorization_response = str(request.url)
 
-    fetch_token(authorization_response, user_id, db)
+    fetch_token(
+        authorization_response,
+        user_id=user_id, 
+        db=db
+    )
 
     return RedirectResponse(
         url=f"{FRONTEND_BASE_URL}/dashboard?gmail_auth=success"

@@ -76,10 +76,9 @@ def save_token_to_db(user_id: int, token_json: str):
     finally:
         db.close()
 
-
 def fetch_token(
     authorization_response: str,
-    user_id: str,
+    user_id: int,
     db: Session
 ):
     flow = get_flow()
@@ -88,7 +87,12 @@ def fetch_token(
 
     token_json = credentials.to_json()
 
-    token = db.get(GmailToken, user_id)
+    token = (
+        db.query(GmailToken)
+        .filter(GmailToken.user_id == user_id)
+        .first()
+    )
+
     if token:
         token.token_json = token_json
     else:
@@ -100,7 +104,6 @@ def fetch_token(
 
     db.commit()
     return credentials
-
 
 def has_valid_token(user_id: int) -> bool:
     """
