@@ -77,18 +77,28 @@ def save_token_to_db(user_id: int, token_json: str):
         db.close()
 
 
-def fetch_token(authorization_response: str, user_id: int):
-    """
-    認証コードから token を取得し DB に保存
-    （/api/gmail/callback 用）
-    """
+def fetch_token(
+    authorization_response: str,
+    user_id: str,
+    db: Session
+):
     flow = get_flow()
     flow.fetch_token(authorization_response=authorization_response)
-
     credentials = flow.credentials
-    save_token_to_db(user_id=user_id, token_json=credentials.to_json())
 
-    print("✅ Gmail token saved to DB")
+    token_json = credentials.to_json()
+
+    token = db.get(GmailToken, user_id)
+    if token:
+        token.token_json = token_json
+    else:
+        token = GmailToken(
+            user_id=user_id,
+            token_json=token_json
+        )
+        db.add(token)
+
+    db.commit()
     return credentials
 
 
