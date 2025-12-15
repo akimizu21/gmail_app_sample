@@ -36,7 +36,7 @@ def get_flow(redirect_uri: str | None = None) -> Flow:
         }
     }
 
-    flow = Flow.from_client_secrets_file(
+    flow = Flow.from_client_config(
         client_config,
         scopes=SCOPES,
         redirect_uri=redirect_uri
