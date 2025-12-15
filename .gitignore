@@ -1,0 +1,60 @@
+# --- 共通ログ ---
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Node / frontend ---
+node_modules
+dist
+dist-ssr
+*.local
+frontend/.vite
+frontend/.cache
+frontend/.parcel-cache
+
+# --- Python / backend ---
+.venv
+__pycache__
+*.pyc
+backend/.ruff_cache
+backend/.mypy_cache
+backend/.pytest_cache
+.cache
+
+# --- env (秘密情報) ---
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# --- Google OAuth 秘密鍵 / トークン ---
+backend/app/client_secret.json
+backend/app/credentials.json
+backend/app/token.json
+backend/app/tokens/
+tokens/
+
+# --- SQLite DB ---
+backend/*.db
+backend/**/*.db
+*.sqlite
+*.sqlite3
+
+# --- Editor / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# その他
+**/.Trash
