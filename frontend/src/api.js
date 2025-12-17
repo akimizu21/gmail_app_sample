@@ -1,9 +1,9 @@
 // src/api.js
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
-    // ★ これがないと Cookie（セッション）が保存・送信されない
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
@@ -49,4 +49,37 @@ export const api = {
   getEmails() {
     return apiFetch("/api/gmail");
   },
+
+  // ★ ここから追加（or 修正）
+  fetchEvents() {
+    return apiFetch("/api/events");
+  },
+
+  syncEvents() {
+    return apiFetch("/api/events/sync", {
+      method: "POST",
+    });
+  },
+
+  // src/api.js の export const api = { ... } の中に追加
+
+  getEvent(id) {
+    return apiFetch(`/api/events/${id}`);
+  },
+
+  updateEvent(id, payload) {
+    return apiFetch(`/api/events/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteEvent(id) {
+    return apiFetch(`/api/events/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+
 };
+

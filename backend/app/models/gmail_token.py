@@ -21,3 +21,5 @@ class GmailToken(Base):
     )
 
     user = relationship("User", backref="gmail_token")
+
+

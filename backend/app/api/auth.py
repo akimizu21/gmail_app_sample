@@ -20,11 +20,7 @@ class GoogleAuthRequest(BaseModel):
 
 
 @router.post("/auth/google")
-async def google_auth(
-    body: GoogleAuthRequest,
-    request: Request,
-    db: Session = Depends(get_db),
-):
+async def google_auth(body: GoogleAuthRequest, request: Request, db: Session = Depends(get_db)):
     """Googleログイン (IDトークン検証)"""
     try:
         if not GOOGLE_CLIENT_ID:
@@ -39,30 +35,28 @@ async def google_auth(
 
         google_sub = idinfo["sub"]
 
-        # ユーザー取得 or 作成
         user = db.query(User).filter(User.google_sub == google_sub).first()
         if not user:
             user = User(
                 google_sub=google_sub,
                 email=idinfo.get("email"),
-                name=idinfo.get("name", ""),
+                name=idinfo.get("name",""),
             )
             db.add(user)
             db.commit()
             db.refresh(user)
 
-        # セッション保存（google_sub はOK）
+        # セッションに保存
         request.session["google_id"] = google_sub
         request.session["email"] = user.email
         request.session["name"] = user.name
 
-        # ★★ ここが最大の修正点 ★★
         gmail_authorized = has_valid_token(user.id)
 
         return JSONResponse(
             {
                 "message": "認証成功",
-                "user": {
+                 "user": {
                     "id": user.id,
                     "google_sub": user.google_sub,
                     "email": user.email,
@@ -92,27 +86,17 @@ async def logout(request: Request):
 
 
 @router.get("/user")
-async def get_user(
-    request: Request,
-    db: Session = Depends(get_db),
-):
+async def get_user(request: Request):
     """現在ログイン中のユーザー情報を取得"""
     session = request.session
     if "google_id" not in session:
         raise HTTPException(status_code=401, detail="未ログイン")
 
-    google_sub = session["google_id"]
-
-    user = db.query(User).filter(User.google_sub == google_sub).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    gmail_authorized = has_valid_token(user.id)
+    gmail_authorized = has_valid_token(session["google_id"])
 
     return {
-        "id": user.id,
-        "google_sub": user.google_sub,
-        "email": user.email,
-        "name": user.name,
+        "google_id": session["google_id"],
+        "email": session.get("email"),
+        "name": session.get("name"),
         "gmail_authorized": gmail_authorized,
     }

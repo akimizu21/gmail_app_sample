@@ -43,10 +43,6 @@ async def gmail_callback(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    # デバック用ログ
-    print("🔥🔥🔥 gmail_callback に到達しました")
-    print("URL:", request.url)
-
     session = request.session
     if "google_id" not in session:
         return RedirectResponse(
@@ -72,6 +68,7 @@ async def gmail_callback(
     return RedirectResponse(
         url=f"{FRONTEND_BASE_URL}/dashboard?gmail_auth=success"
     )
+
 
 
 # ============================

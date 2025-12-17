@@ -1,5 +1,4 @@
 # backend/app/creds.py
-# モジュールも一部追加
 import os
 import json
 from pathlib import Path
@@ -12,7 +11,6 @@ from sqlalchemy.orm import Session
 
 from app.models.gmail_token import GmailToken
 from app.database import SessionLocal
-
 
 SCOPES = ['https://mail.google.com/']
 
@@ -51,7 +49,6 @@ def get_flow(redirect_uri: str | None = None) -> Flow:
 
     return flow
 
-
 def get_authorization_url():
     """認証URLを取得"""
     flow = get_flow()
@@ -62,7 +59,6 @@ def get_authorization_url():
     )
     return authorization_url, state
 
-# 以下追加したコード
 # ============================
 # Token 保存・取得（DB）
 # ============================
@@ -161,30 +157,3 @@ def load_credentials(user_id: int) -> Credentials:
         )
     finally:
         db.close()
-
-
-# # ❗❗❗ ここだけ修正が必要
-# # from gmail_service import get_user_token_path  ←✗ 動かない
-# # 相対インポートに変更
-# from app.gmail_service import get_user_token_path  # 再利用
-
-
-# def fetch_token(authorization_response: str, user_id: str):
-#     """認証コードからトークンを取得して保存"""
-#     flow = get_flow()
-
-#     flow.fetch_token(authorization_response=authorization_response)
-#     credentials = flow.credentials
-
-#     token_path = get_user_token_path(user_id)
-#     token_path.parent.mkdir(exist_ok=True, parents=True)
-#     token_path.write_text(credentials.to_json(), encoding="utf-8")
-
-#     print(f"✅ トークン保存完了: {token_path}")
-#     return credentials
-
-# def has_valid_token(user_id: str) -> bool:
-#     """ユーザーのトークンが存在するか確認"""
-#     token_path = get_user_token_path(user_id)
-#     return token_path.exists()
-

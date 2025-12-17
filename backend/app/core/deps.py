@@ -1,4 +1,3 @@
-# backend/app/core/deps.py
 from fastapi import HTTPException, Request, Depends
 from sqlalchemy.orm import Session
 
