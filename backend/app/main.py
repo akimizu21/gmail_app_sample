@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from app.core.settings import SESSION_SECRET_KEY
+from app.core.settings import SESSION_SECRET_KEY, FRONTEND_BASE_URL
 from app.api.auth import router as auth_router
 from app.api.gmail import router as gmail_router
 from app.api.events import router as events_router  # events_router を使う
@@ -20,11 +20,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        FRONTEND_BASE_URL,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "FRONTEND_BASE_URL",
     ],
     allow_credentials=True,
     allow_methods=["*"],
