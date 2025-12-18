@@ -1,6 +1,6 @@
 # backend/app/api/gmail.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 import re
 from typing import List
@@ -61,14 +61,13 @@ async def gmail_callback(
 
     fetch_token(
         authorization_response=authorization_response,
-        user_id=user.id, 
+        user_id=user.id,
         db=db
     )
 
     return RedirectResponse(
         url=f"{FRONTEND_BASE_URL}/dashboard?gmail_auth=success"
     )
-
 
 
 # ============================
@@ -89,7 +88,6 @@ async def get_gmail_data(user_id: int = Depends(get_current_user_id)):
         return {"emails": emails}
     except Exception as e:
         import traceback
-
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
@@ -100,39 +98,6 @@ async def get_gmail_data(user_id: int = Depends(get_current_user_id)):
 # ============================
 # ヘルパ（DB 保存／Event 自動生成 用）
 # ============================
-
-def _get_or_create_user(
-    db: Session,
-    google_sub: str,
-    email_addr: str | None = None,
-    name: str | None = None,
-) -> User:
-    """
-    User テーブルに Google ユーザー情報を保存。
-    主キーは user.id、Google の sub は user.google_sub という前提。
-    """
-    user = db.query(User).filter(User.google_sub == google_sub).first()
-    if user:
-        updated = False
-        if email_addr and not user.email:
-            user.email = email_addr
-            updated = True
-        if name and not user.name:
-            user.name = name
-            updated = True
-        if updated:
-            db.add(user)
-        return user
-
-    user = User(
-        google_sub=google_sub,
-        email=email_addr,
-        name=name,
-    )
-    db.add(user)
-    db.flush()
-    return user
-
 
 def _parse_received_at(header_date: str | None) -> datetime | None:
     if not header_date:
@@ -145,38 +110,47 @@ def _parse_received_at(header_date: str | None) -> datetime | None:
 
 
 def _infer_event_type(subject: str | None) -> str:
+    """件名からイベントタイプを推測"""
     if not subject:
-        return "その他"
-    if "面接" in subject:
-        return "面接"
-    if "選考" in subject:
-        return "面接"
+        return "other"
+    if "面接" in subject or "選考" in subject:
+        return "interview"
     if "説明会" in subject or "セミナー" in subject:
-        return "説明会"
-    return "その他"
+        return "briefing"
+    return "other"
 
 
 def _guess_company_from_subject(subject: str | None) -> str | None:
+    """件名から会社名を抽出"""
     if not subject:
         return None
-    # すごく簡易なパターン：先頭の「〇〇株式会社」までを拾う
+    # 「〇〇株式会社」パターン
     m = re.search(r"(.+?株式会社)", subject)
+    if m:
+        return m.group(1)
+    # 【】内のテキスト
+    m = re.search(r"【(.+?)】", subject)
     if m:
         return m.group(1)
     return None
 
 
-def _make_event_from_email(email: Email) -> Event:
+def _make_event_from_email(email: Email) -> Event | None:
     """
-    Email 行からざっくり Event を自動生成。
-    日付・場所などの抽出ロジックはあとで強化予定。
+    Email からイベントを自動生成。
+    面接・説明会関連のメールのみイベントを作成。
     """
     subject = email.subject or "(件名なし)"
     event_type = _infer_event_type(subject)
+    
+    # 面接・説明会以外はスキップ
+    if event_type == "other":
+        print(f"  -> Skipping (event_type=other): {subject}")
+        return None
+    
     company = _guess_company_from_subject(subject)
-
-    # ここでは start_at はとりあえず受信日時にしておく（あとで本文から抽出でもOK）
-    start_at = email.received_at
+    now = datetime.now(timezone.utc)  # ✅ timezone-aware datetime
+    start_at = email.received_at or now
 
     ev = Event(
         user_id=email.user_id,
@@ -185,8 +159,10 @@ def _make_event_from_email(email: Email) -> Event:
         company_name=company,
         event_type=event_type,
         start_at=start_at,
-        status="draft",   # 下書き状態（ユーザーが後で編集・確定）
-        source="auto",    # 自動生成
+        status="scheduled",
+        source="auto",
+        created_at=now,      # ✅ 追加
+        updated_at=now,      # ✅ 追加
     )
     return ev
 
@@ -195,57 +171,46 @@ def _make_event_from_email(email: Email) -> Event:
 # Gmail → DB 取込API
 # ============================
 
-# backend/app/api/gmail.py
-
 @router.post("/gmail/import")
 async def import_gmail(
     request: Request,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(get_current_user_id),  # ✅ user.id (int)
     db: Session = Depends(get_db),
 ) -> dict:
     """
     Gmail からメールを取得して DB（emails/events）に保存し、
     自動生成された Event の一覧を返す。
     """
-    # セッションから email / name を取れるなら User 作成時に使う
-    session = request.session
-    session_email = session.get("email")
-    session_name = session.get("name")
-
     print("=== /api/gmail/import called ===")
-    print(f"  user_id (google_sub): {user_id}")
-    print(f"  session email: {session_email}, name: {session_name}")
+    print(f"  user_id: {user_id}")
 
-    user = _get_or_create_user(
-        db,
-        user_id=user_id,
-        email_addr=session_email,
-        name=session_name,
-    )
-    print(f"  DB user.id = {user.id}")
+    # ✅ user_id から直接 User を取得
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    print(f"  DB user.id = {user.id}, email = {user.email}")
 
     # Gmail API から実際のメールを取得
-    messages = get_emails(user_id, max_results=20)  # 例として 20件
+    messages = get_emails(user_id, max_results=20)
     print(f"  Gmail messages fetched: {len(messages)}")
 
     imported_emails = 0
     new_events: List[Event] = []
 
     for idx, m in enumerate(messages):
-        print(f"--- message #{idx} ---")
-        print(f"  keys: {list(m.keys())}")
-        print(f"  id: {m.get('id')}, subject: {m.get('subject')!r}")
-
         gmail_id = m["id"]
+        subject = m.get("subject", "(no subject)")
+        print(f"--- message #{idx}: {subject[:50]}... ---")
 
-        # すでに取り込み済みならスキップ（デバッグ表示付き）
+        # すでに取り込み済みならスキップ
         exists = (
             db.query(Email)
             .filter(Email.user_id == user.id, Email.gmail_message_id == gmail_id)
             .first()
         )
         if exists:
-            print(f"  -> already exists in DB (email.id={exists.id}), skip")
+            print(f"  -> already exists (email.id={exists.id}), skip")
             continue
 
         email_obj = Email(
@@ -259,20 +224,20 @@ async def import_gmail(
             processing_status="queued",
         )
         db.add(email_obj)
-        db.flush()  # email_obj.id を取るため
+        db.flush()
         print(f"  -> inserted Email.id={email_obj.id}")
 
         imported_emails += 1
 
-        # とりあえず全メールから Event を作ってみる
+        # イベント自動生成（面接・説明会のみ）
         ev = _make_event_from_email(email_obj)
         if ev:
             db.add(ev)
             new_events.append(ev)
-            print(f"  -> created Event (title={ev.title!r})")
+            print(f"  -> created Event: {ev.event_type} - {ev.company_name}")
 
     db.commit()
-    print(f"=== /api/gmail/import DONE: imported_emails={imported_emails}, new_events={len(new_events)} ===")
+    print(f"=== DONE: imported_emails={imported_emails}, new_events={len(new_events)} ===")
 
     return {
         "imported_emails": imported_emails,
