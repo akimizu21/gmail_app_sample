@@ -86,17 +86,29 @@ async def logout(request: Request):
 
 
 @router.get("/user")
-async def get_user(request: Request):
+async def get_user(
+    request: Request,
+    db: Session = Depends(get_db),  # ✅ 追加
+):
     """現在ログイン中のユーザー情報を取得"""
     session = request.session
     if "google_id" not in session:
         raise HTTPException(status_code=401, detail="未ログイン")
 
-    gmail_authorized = has_valid_token(session["google_id"])
+    google_sub = session["google_id"]
+
+    # ✅ google_sub から user を取得
+    user = db.query(User).filter(User.google_sub == google_sub).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # ✅ user.id を渡す
+    gmail_authorized = has_valid_token(user.id)
 
     return {
-        "google_id": session["google_id"],
-        "email": session.get("email"),
-        "name": session.get("name"),
+        "id": user.id,
+        "google_sub": user.google_sub,
+        "email": user.email,
+        "name": user.name,
         "gmail_authorized": gmail_authorized,
     }
