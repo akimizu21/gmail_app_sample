@@ -76,7 +76,7 @@ async def gmail_callback(
 # ============================
 
 @router.get("/gmail")
-async def get_gmail_data(user_id: str = Depends(get_current_user_id)):
+async def get_gmail_data(user_id: int = Depends(get_current_user_id)):
     """ログインユーザーのGmailを直接取得して返す（DBには保存しない）"""
     if not has_valid_token(user_id):
         raise HTTPException(
@@ -180,7 +180,7 @@ def _make_event_from_email(email: Email) -> Event:
 
     ev = Event(
         user_id=email.user_id,
-        source_email_id=email.id,
+        email_id=email.id,
         title=subject,
         company_name=company,
         event_type=event_type,
@@ -200,7 +200,7 @@ def _make_event_from_email(email: Email) -> Event:
 @router.post("/gmail/import")
 async def import_gmail(
     request: Request,
-    user_id: str = Depends(get_current_user_id),
+    user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
     """
@@ -218,7 +218,7 @@ async def import_gmail(
 
     user = _get_or_create_user(
         db,
-        google_sub=user_id,
+        user_id=user_id,
         email_addr=session_email,
         name=session_name,
     )
